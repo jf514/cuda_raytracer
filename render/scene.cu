@@ -2,42 +2,43 @@
 
 #include <cstdio>
 #include <fstream>
-#include <iostream>
+#include<iostream>
 
+
+// GPU version of the same function
 __global__ void Render(Vector3* img, int N){
     int tx = blockIdx.x*blockDim.x+threadIdx.x;
     int ty = blockIdx.y*blockDim.y+threadIdx.y;
 
-    const float x = tx - 0.5f*N;
-    float y = ty - 0.5f*N;
+    Sphere sphere(Vector3{float(N/2),float(N/2),10}, 120);
+    Ray ray{Vector3{float(tx), float(ty), 0}, Vector3{0,0,1}};
 
-    float rt = std::sqrt( x*x + y*y );
-    if(rt < 0.25f * N) {
-        img[tx + N*ty] = Vector3(0.5,0,0);
+    Hit h = collide(ray, sphere);
+    if(h.hit){
+        img[tx + N*ty] = 0.5*(1 + h.n);
     } else {
-        img[tx + N*ty] = Vector3(0.5,1,1);
+        img[tx + N*ty] = Vector3{0,0,0};
     }
 }
 
 // CPU version of the same function
 void RenderCPU(Vector3* img, int N){
+    Sphere sphere(Vector3{float(N/2),float(N/2),10}, 120);
     for(int tx = 0; tx < N; ++tx){
         for(int ty = 0; ty < N; ++ty){
-            float x = tx - 0.5*N;
-            float y = ty - 0.5*N;
-        
-            float rt = std::sqrt( x*x + y*y );
-            if(rt < 0.25 * N) {
-                img[tx + N*ty] = Vector3(0.5,0,0);
+            Ray ray{Vector3{float(tx), float(ty), 0}, Vector3{0,0,1}};
+
+            Hit h = collide(ray, sphere);
+            if(h.hit){
+                img[tx + N*ty] = 0.5*(0.99 + h.n);
             } else {
-                img[tx + N*ty] = Vector3(1,1,1);
+                img[tx + N*ty] = Vector3{0,0,0};
             }
         }
     }
 }
 
 int main(int argc, char* argv[]){
-
     // Image side length - for this image size 
     // we expect CPU to be faster. For my architecture
     // I don't see the GPU going faster until 
@@ -88,5 +89,4 @@ int main(int argc, char* argv[]){
     WritePPM("test_out.ppm", img_h, N);
     delete[] img_h;
 
-    return 0;
 }
