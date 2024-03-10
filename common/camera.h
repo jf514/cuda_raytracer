@@ -58,8 +58,6 @@ class Camera {
         // Calculate the horizontal and vertical delta vectors from pixel to pixel.
         pixel_delta_u = viewport_u / image_width;
         pixel_delta_v = viewport_v / image_height;
-        printdb("du", pixel_delta_u);
-        printdb("dv", pixel_delta_v);
 
         // Calculate the location of the upper left pixel.
         Vector3 viewport_upper_left = center - (focal_length * w) - viewport_u/2 - viewport_v/2;
@@ -74,8 +72,6 @@ __host__ __device__ Ray Camera::get_ray(int i, int j) const {
         Vector3 ray_origin = center;
         Vector3 ray_direction = normalize(pixel_sample - ray_origin);
         Ray out(ray_origin, ray_direction);
-
-        //printdb("out", out);
 
         return out;
 }
