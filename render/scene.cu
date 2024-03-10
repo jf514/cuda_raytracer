@@ -4,14 +4,10 @@
 #include <fstream>
 #include<iostream>
 
-
-// GPU version of the same function
-__global__ void Render(Vector3* img, int N){
-    int tx = blockIdx.x*blockDim.x+threadIdx.x;
-    int ty = blockIdx.y*blockDim.y+threadIdx.y;
-
-    Sphere sphere(Vector3{float(N/2),float(N/2),10}, 120);
-    Ray ray{Vector3{float(tx), float(ty), 0}, Vector3{0,0,1}};
+__host__ __device__ void RenderImp(Vector3* img, Camera cam, int tx, int ty){
+    int N = cam.image_width;
+    Sphere sphere( Vector3{0,0,1}, 1);
+    Ray ray = cam.get_ray(tx, ty);
 
     Hit h = collide(ray, sphere);
     if(h.hit){
@@ -21,31 +17,43 @@ __global__ void Render(Vector3* img, int N){
     }
 }
 
+
+// GPU version of the same function
+__global__ void Render(Vector3* img, Camera cam){
+    int tx = blockIdx.x*blockDim.x+threadIdx.x;
+    int ty = blockIdx.y*blockDim.y+threadIdx.y;
+
+    RenderImp(img, cam, tx, ty);
+}
+
 // CPU version of the same function
-void RenderCPU(Vector3* img, int N){
-    Sphere sphere(Vector3{float(N/2),float(N/2),10}, 120);
+void RenderCPU(Vector3* img, Camera cam){
+    int N = cam.image_width;
     for(int tx = 0; tx < N; ++tx){
         for(int ty = 0; ty < N; ++ty){
-            Ray ray{Vector3{float(tx), float(ty), 0}, Vector3{0,0,1}};
-
-            Hit h = collide(ray, sphere);
-            if(h.hit){
-                img[tx + N*ty] = 0.5*(0.99 + h.n);
-            } else {
-                img[tx + N*ty] = Vector3{0,0,0};
-            }
+            RenderImp(img, cam, tx, ty);
         }
     }
 }
 
 int main(int argc, char* argv[]){
+ 
     // Image side length - for this image size 
     // we expect CPU to be faster. For my architecture
     // I don't see the GPU going faster until 
     // N = 8 * 512, if we include memory transfer. However,
-    // excluding transfer we see a speef up of a factor of
+    // excluding transfer we see a speed up of a factor of
     // 100.
     const int N = 512;
+
+    // Set up camera
+    Camera cam;
+    cam.image_width = N;
+    
+    // Set up scene
+    Sphere* scene = new Sphere[2];
+    scene[0] = Sphere(Vector3{0,0,5}, 1);
+    scene[1] = Sphere(Vector3{2,2,5}, 2); 
 
     // Represent images as 1-D array of size N*N
     Vector3* img_h = new Vector3[N*N];
@@ -57,7 +65,7 @@ int main(int argc, char* argv[]){
  
         Timer timer;
         tick(timer);
-        RenderCPU(img_h, N);
+        RenderCPU(img_h, cam);
 
         deltaT = tick(timer);
 
@@ -76,7 +84,7 @@ int main(int argc, char* argv[]){
 
         Timer timer;
         tick(timer);
-        Render<<<numBlocks, blockThreadDist>>>(img_d, N);
+        Render<<<numBlocks, blockThreadDist>>>(img_d, cam);
         deltaT = tick(timer);
 
         cudaMemcpy(img_h, img_d, N*N*sizeof(Vector3), cudaMemcpyDeviceToHost);

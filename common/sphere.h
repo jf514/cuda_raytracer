@@ -2,8 +2,7 @@
 #define COMMON_SPHERE_H
 #pragma once
 
-#include "ray.h"
-#include "vector.h"
+#include "common.h"
 
 #include <cmath>
 #include <limits>
@@ -30,6 +29,9 @@ struct Hit {
 };
 
 struct Sphere {
+
+    Sphere() = default;
+
     __host__ __device__ Sphere(const Vector3& center, float radius) 
         : center(center)
         , radius(radius)
