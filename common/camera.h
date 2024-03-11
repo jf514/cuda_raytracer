@@ -19,8 +19,8 @@ class Camera {
     int    max_depth         = 10;   // Maximum number of ray bounces into scene
 
     double vfov     = 90;              // Vertical view angle (field of view)
-    Vector3 lookfrom = Vector3(0,0,-1);  // Point camera is looking from
-    Vector3 lookat   = Vector3(0,0,0);   // Point camera is looking at
+    Vector3 lookfrom = Vector3(0,0, 1);  // Point camera is looking from
+    Vector3 lookat   = Vector3(0,0,-1);   // Point camera is looking at
     Vector3   vup      = Vector3(0,1,0);     // Camera-relative "up" direction
 
     __host__ __device__ Ray get_ray(int i, int j) const;
@@ -54,6 +54,9 @@ class Camera {
         // Calculate the vectors across the horizontal and down the vertical viewport edges.
         Vector3 viewport_u = viewport_width * u;    // Vector across viewport horizontal edge
         Vector3 viewport_v = viewport_height * -v;  // Vector down viewport vertical edge
+
+        printdb("u", viewport_u);
+        printdb("v", viewport_v);
 
         // Calculate the horizontal and vertical delta vectors from pixel to pixel.
         pixel_delta_u = viewport_u / image_width;

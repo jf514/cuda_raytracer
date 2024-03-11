@@ -9,16 +9,16 @@ struct Ray {
 
     __host__ __device__ Ray(const Vector3& origin, const Vector3& dir) 
         : o(origin)
-        , n(dir)
+        , dir(dir)
         {}
 
-    __host__ __device__ Vector3 at(float t) const { return o + t*n; }
+    __host__ __device__ Vector3 at(float t) const { return o + t*dir; }
 
     // Origin
     Vector3 o;
 
     // Direction
-    Vector3 n;
+    Vector3 dir;
 }; 
 
 #endif // COMMON_RAY_H

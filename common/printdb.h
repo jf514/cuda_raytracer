@@ -13,7 +13,7 @@
 #define __HD__ __host__ __device__
 #endif
 
-__HD__ __HD__ void printdb(const char* str){
+__HD__ void printdb(const char* str){
     printf("%s\n", str);
 }
 
@@ -30,7 +30,7 @@ __HD__ void printdb(const char* str, const Vector3& v){
 __HD__ void printdb(const char* str, const Ray& ray){
     printf("%s\n", str);
     printdb("ray.o", ray.o);
-    printdb("ray.n", ray.n);
+    printdb("ray.dir", ray.dir);
 }
 
 __HD__ void printdb(const char* str, const Hit& hit){

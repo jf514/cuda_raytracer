@@ -2,7 +2,9 @@
 #define COMMON_SPHERE_H
 #pragma once
 
-#include "common.h"
+//#include "common.h"
+#include "ray.h"
+#include "vector.h"
 
 #include <cmath>
 #include <limits>
@@ -48,8 +50,8 @@ struct Sphere {
 
 __host__ __device__ Hit collide(const Ray& ray, const Sphere& sphere){
     Vector3 oc = ray.o - sphere.center;
-    auto a = length_squared(ray.n);
-    auto b = 2.0 * dot(oc, ray.n);
+    auto a = length_squared(ray.dir);
+    auto b = 2.0 * dot(oc, ray.dir);
     auto c = dot(oc, oc) - sphere.radius*sphere.radius;
     auto discriminant = b*b - 4*a*c;
 
@@ -71,7 +73,7 @@ __host__ __device__ Hit collide(const Ray& ray, const Sphere& sphere){
 
         // Set normal to always be opposite of ray, even 
         // the ray is coming from the inside.
-        h.n = dot(out_norm, ray.n) < 0 ? out_norm : -out_norm;  
+        h.n = dot(out_norm, ray.dir) < 0 ? out_norm : -out_norm;  
     
         return h;
     }
