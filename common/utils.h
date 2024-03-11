@@ -19,8 +19,8 @@ void WritePPM(const std::string& filename, Vector3* img, int N) {
     outFile << "P3\n" << N << " " << N << "\n255\n";
 
     // Generate and write pixel data
-    for (int i = 0; i < N; ++i) { // Rows
-        for (int j = 0; j < N; ++j) { // Columns
+    for (int j = 0; j < N; ++j) { // Rows
+        for (int  i = 0; i < N; ++i) { // Columns
             // Example gradient effect based on position
             int red = static_cast<int>(255 * img[i + N*j].x);
             int green = static_cast<int>(255 * img[i + N*j].y);
