@@ -48,35 +48,34 @@ struct Sphere {
     float radius;
 };
 
-__host__ __device__ Hit collide(const Ray& ray, const Sphere& sphere){
+__host__ __device__ Hit collide(const Ray& ray, const Sphere& sphere, 
+                                float tmin = 0, 
+                                float tmax = std::numeric_limits<float>::max()){
     Vector3 oc = ray.o - sphere.center;
-    auto a = length_squared(ray.dir);
-    auto b = 2.0 * dot(oc, ray.dir);
-    auto c = dot(oc, oc) - sphere.radius*sphere.radius;
-    auto discriminant = b*b - 4*a*c;
+    float a = dot(ray.o, ray.o);
+    float half_b = dot(oc, ray.dir);
+    float c = dot(oc, oc) - sphere.radius*sphere.radius;
 
-    if (discriminant < 0) {
-        return Hit::EmptyHit();
-    } else {
-        Hit h;
-        h.hit = true;
-        // Prefer the closer hit (smaller root)
-        h.t = (-b - std::sqrt(discriminant) ) / (2.0*a);
-        // ...but if the ray starts inside, we may
-        // have to consider the other root. 
-        if(h.t < 0){
-            h.t = (-b + std::sqrt(discriminant) ) / (2.0*a);
-        }
+    float discriminant = half_b*half_b - a*c;
+    if (discriminant < 0) return Hit::EmptyHit();
+    float sqrtd = sqrt(discriminant);
 
-        h.position = ray.at(h.t);
-        Vector3 out_norm = normalize(h.position - sphere.center);
-
-        // Set normal to always be opposite of ray, even 
-        // the ray is coming from the inside.
-        h.n = dot(out_norm, ray.dir) < 0 ? out_norm : -out_norm;  
-    
-        return h;
+    // Find the nearest root that lies in the acceptable range.
+    float root = (-half_b - sqrtd) / a;
+    if (root <= tmin || tmax <= root) {
+        root = (-half_b + sqrtd) / a;
+        if (root <= tmin || tmax <= root)
+            return Hit::EmptyHit();
     }
+
+    Hit hit;
+
+    hit.hit = true;
+    hit.t = root;
+    hit.position = ray.at(hit.t);
+    hit.n = (hit.position - sphere.center) / sphere.radius;
+
+    return hit;
 }
 
 #endif // COMMON_SPHERE
