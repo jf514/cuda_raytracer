@@ -1,6 +1,6 @@
 # Cuda Raytracer: cuda_raytracer (Work in Progress)
 
-This is a simple GPU accelerated raytracer, using CUDA, as the final project CSE 272 at UCSD. The goals are teaching myself raytracing, and CUDA.
+This is a simple GPU accelerated raytracer, using CUDA, as the final project CSE 272 at UCSD. The goals are exploring the ideas of basic and advanced raytracing, and CUDA.
 
 Many elements are borrowed from:
 - [Raytracing in a Single Weekend](https://raytracing.github.io/)
