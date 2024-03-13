@@ -1,7 +1,6 @@
-#pragma once
-
 #ifndef COMMON_VECTOR3_H
 #define COMMON_VECTOR3_H
+#pragma once
 
 #include <algorithm>
 #include <math.h>
@@ -26,6 +25,23 @@ struct Vector2 {
     float x, y;
 };
 
+struct Vector2i {
+    Vector2i() {}
+
+    Vector2i(int x, int y) : x(x), y(y) {}
+    
+    Vector2i(const Vector2i &v) : x(v.x), y(v.y) {}
+
+    int& operator[](int i) {
+        return *(&x + i);
+    }
+
+    int operator[](int i) const {
+        return *(&x + i);
+    }
+
+    int x, y;
+};
 
 struct Vector3 {
 
@@ -174,7 +190,7 @@ struct Vector4 {
     return v;
 }
 
-    __host__ __device__ Vector3 abs(const Vector3& v){
+    __host__ __device__ inline Vector3 abs(const Vector3& v){
         return Vector3{fabsf(v.x), fabsf(v.y), fabsf(v.z)};
     }
 

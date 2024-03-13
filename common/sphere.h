@@ -2,7 +2,6 @@
 #define COMMON_SPHERE_H
 #pragma once
 
-//#include "common.h"
 #include "ray.h"
 #include "vector.h"
 
@@ -52,7 +51,7 @@ __host__ __device__ Hit collide(const Ray& ray, const Sphere& sphere,
                                 float tmin = 0, 
                                 float tmax = std::numeric_limits<float>::max()){
     Vector3 oc = ray.o - sphere.center;
-    float a = dot(ray.o, ray.o);
+    float a = dot(ray.dir, ray.dir);
     float half_b = dot(oc, ray.dir);
     float c = dot(oc, oc) - sphere.radius*sphere.radius;
 
@@ -72,6 +71,7 @@ __host__ __device__ Hit collide(const Ray& ray, const Sphere& sphere,
 
     hit.hit = true;
     hit.t = root;
+    //printf("root: %f\n", root);
     hit.position = ray.at(hit.t);
     hit.n = (hit.position - sphere.center) / sphere.radius;
 

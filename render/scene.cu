@@ -1,8 +1,11 @@
 #include "common.h"
+#include "parallel.h"
+#include "pcg.h"
 
 #include <cstdio>
 #include <fstream>
-#include<iostream>
+#include <iostream>
+#include <thread>
 
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
 void check_cuda(cudaError_t result, char const *const func, const char *const file, int const line) {
@@ -15,14 +18,17 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
     }
 }
 
-__host__ __device__ void RenderImp(Vector3* img, Camera cam, Sphere* scene, int num_spheres, int tx, int ty){
+__host__ __device__ void RenderImpl(Vector3* img, Camera cam, Sphere* scene, int num_spheres, int tx, int ty){
     int N = cam.image_width;
+    //tx = N/2;
+    //ty = N/2;
     Ray ray = cam.get_ray(tx, ty);
- 
+    //printdb("Ray", ray);
+
     for(int i = 0; i < num_spheres; ++i){
         Hit h = collide(ray, scene[i]);
         if (h.hit) {
-            //printdb("hit");
+            //printdb("hit pos", h.position);
             img[tx + N*ty] = 0.5f*Vector3(h.n.x+1.0f, h.n.y+1.0f, h.n.z+1.0f);
             return;
         }
@@ -38,21 +44,34 @@ __global__ void Render(Vector3* img, Camera cam, Sphere* scene, int num_spheres)
     int tx = blockIdx.x*blockDim.x+threadIdx.x;
     int ty = blockIdx.y*blockDim.y+threadIdx.y;
 
-    RenderImp(img, cam, scene, num_spheres, tx, ty);
+    RenderImpl(img, cam, scene, num_spheres, tx, ty);
 }
 
-// CPU version of the same function
 void RenderCPU(Vector3* img, Camera cam, Sphere* scene, int num_spheres){
-    int N = cam.image_width;
-    for(int tx = 0; tx < N; ++tx){
-        for(int ty = 0; ty < N; ++ty){
-            RenderImp(img, cam, scene, num_spheres, tx, ty);
+    int h = cam.image_width;
+    int w = cam.image_width;
+
+    constexpr int tile_size = 16;
+    int num_tiles_x = (w + tile_size - 1) / tile_size;
+    int num_tiles_y = (h + tile_size - 1) / tile_size;
+
+    parallel_for([&](const Vector2i &tile) {
+        // Use a different rng stream for each thread.
+        pcg32_state rng = init_pcg32(tile[1] * num_tiles_x + tile[0]);
+        int x0 = tile[0] * tile_size;
+        int x1 = min(x0 + tile_size, w);
+        int y0 = tile[1] * tile_size;
+        int y1 = min(y0 + tile_size, h);
+        for (int y = y0; y < y1; y++) {
+            for (int x = x0; x < x1; x++) {
+                RenderImpl(img, cam, scene, num_spheres, x, y);
+            }
         }
-    }
+    }, Vector2i(num_tiles_x, num_tiles_y));
 }
 
 int main(int argc, char* argv[]){
- 
+
     // Image side length - for this image size 
     // we expect CPU to be faster. For my architecture
     // I don't see the GPU going faster until 
@@ -64,13 +83,18 @@ int main(int argc, char* argv[]){
     // Set up camera
     Camera cam;
     cam.image_width = N;
+    cam.lookat = Vector3(0,0,1);
+    cam.lookfrom = Vector3(0,0,0);
+    cam.initialize();
     
     // Set up scene
-    const int num_spheres = 2;
-    Sphere* scene_h = new Sphere[num_spheres];
-    scene_h[0] = Sphere(Vector3{0,0,-1}, 0.1);
-    scene_h[1] = Sphere(Vector3{2,0,-3}, 2); 
-
+    std::vector<Sphere> spheres;
+    spheres.push_back(Sphere(Vector3{0,0,5}, 0.5));
+    spheres.push_back(Sphere(Vector3{0,-100.5,-1}, 100));
+    
+    const int num_spheres = spheres.size();
+    Sphere* scene_h = spheres.data();
+ 
     // Represent images as 1-D array of size N*N
     Vector3* img_h = new Vector3[N*N];
 
@@ -79,11 +103,17 @@ int main(int argc, char* argv[]){
     if(argc > 1 && std::string(argv[1]) == "-cpu"){
         std::cout << "Rendering on CPU...\n";
  
+        //int num_threads = std::thread::hardware_concurrency();
+        int num_threads = 50;
+        parallel_init(num_threads);
+
         Timer timer;
         tick(timer);
         RenderCPU(img_h, cam, scene_h, num_spheres);
 
         deltaT = tick(timer);
+
+        parallel_cleanup();
 
     } else {
         std::cout << "Rendering on GPU...\n";
@@ -110,11 +140,14 @@ int main(int argc, char* argv[]){
         cudaMemcpy(img_h, img_d, N*N*sizeof(Vector3), cudaMemcpyDeviceToHost);
         // Free memory
         cudaFree(img_d);
+        cudaFree(scene_d);
     }
 
     std::cout << "Finished. Took: " << 1000.*deltaT << " milliseconds.\n";
 
     WritePPM("test_out.ppm", img_h, N);
     delete[] img_h;
+
+    //delete that spheres
 
 }

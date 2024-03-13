@@ -21,7 +21,7 @@ LDFLAGS     :=
 #NVCCFLAGS += -g -G
 
 # General flags
-ALL_CCFLAGS := -I ../common
+ALL_CCFLAGS := -I ../common -I ../dependencies
 ALL_CCFLAGS += --threads 0 --std=c++17
 ALL_CCFLAGS += $(NVCCFLAGS)
 ALL_CCFLAGS += $(EXTRA_NVCCFLAGS)
@@ -65,10 +65,13 @@ build: scene
 
 rebuild: clean build
 
+parallel.o: ../common/parallel.cu
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
 scene.o:scene.cu ../common/*.*
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
-scene: scene.o
+scene: scene.o parallel.o
 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 
 run: build

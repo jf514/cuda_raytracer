@@ -40,4 +40,12 @@ __HD__ void printdb(const char* str, const Hit& hit){
     printdb("hit t", hit.t);
 }
 
+__HD__ void printdbln(const char* str, float val){
+    printf("%s: %f", str, val);
+}
+
+__HD__ void printdbln(const char* str, const Vector3& v){
+    printf("%s: %f, %f, %f\n", str, v.x, v.y, v.z);
+}
+
 #endif // COMMON_PRINTDB_H
