@@ -147,6 +147,8 @@ int main(int argc, char* argv[]){
         CHECK_CUDA_ERRORS(cudaFree(img_d));
         CHECK_CUDA_ERRORS(cudaFree(scene_d));
 
+        // Optional in a single threaded context, but use included for
+        // demo purposes.
         cudaDeviceReset();
     }
 
