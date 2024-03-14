@@ -7,7 +7,8 @@
 #include <iostream>
 #include <thread>
 
-#define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
+#define CHECK_CUDA_ERRORS(val) check_cuda( (val), #val, __FILE__, __LINE__ )
+
 void check_cuda(cudaError_t result, char const *const func, const char *const file, int const line) {
     if (result) {
         std::cerr << "CUDA error = " << static_cast<unsigned int>(result) << " at " <<
@@ -118,13 +119,13 @@ int main(int argc, char* argv[]){
     } else {
         std::cout << "Rendering on GPU...\n";
 
-        // Device
+        // Allocate device memory.
         Vector3 *img_d;
-        cudaMalloc(&img_d, N*N*sizeof(Vector3));
+        CHECK_CUDA_ERRORS(cudaMalloc(&img_d, N*N*sizeof(Vector3)));
 
         Sphere* scene_d;
-        cudaMalloc(&scene_d, num_spheres*sizeof(Sphere));
-        cudaMemcpy(scene_d,scene_h,num_spheres*sizeof(Sphere),cudaMemcpyHostToDevice);
+        CHECK_CUDA_ERRORS(cudaMalloc(&scene_d, num_spheres*sizeof(Sphere)));
+        CHECK_CUDA_ERRORS(cudaMemcpy(scene_d,scene_h,num_spheres*sizeof(Sphere),cudaMemcpyHostToDevice));
 
         const dim3 blockThreadDist(32, 32);
         const dim3 numBlocks(
@@ -136,11 +137,17 @@ int main(int argc, char* argv[]){
         tick(timer);
         Render<<<numBlocks, blockThreadDist>>>(img_d, cam, scene_d, num_spheres);
         deltaT = tick(timer);
+        CHECK_CUDA_ERRORS(cudaGetLastError());
+        CHECK_CUDA_ERRORS(cudaDeviceSynchronize());
 
-        cudaMemcpy(img_h, img_d, N*N*sizeof(Vector3), cudaMemcpyDeviceToHost);
-        // Free memory
-        cudaFree(img_d);
-        cudaFree(scene_d);
+        // Copy data back to host.
+        CHECK_CUDA_ERRORS(cudaMemcpy(img_h, img_d, N*N*sizeof(Vector3), cudaMemcpyDeviceToHost));
+
+        // Free memory.
+        CHECK_CUDA_ERRORS(cudaFree(img_d));
+        CHECK_CUDA_ERRORS(cudaFree(scene_d));
+
+        cudaDeviceReset();
     }
 
     std::cout << "Finished. Took: " << 1000.*deltaT << " milliseconds.\n";
