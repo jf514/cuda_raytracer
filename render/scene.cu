@@ -3,6 +3,7 @@
 #include "pcg.h"
 
 #include <cstdio>
+#include <curand_kernel.h>
 #include <fstream>
 #include <iostream>
 #include <thread>
@@ -19,11 +20,12 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
     }
 }
 
-__host__ __device__ void RenderImpl(Vector3* img, Camera cam, Sphere* scene, int num_spheres, int tx, int ty){
+__host__ __device__ void RenderImpl(Vector3* img, Camera cam, 
+        Sphere* scene, int num_spheres, int tx, int ty, float rnd_x, float rnd_y){
     int N = cam.image_width;
     //tx = N/2;
     //ty = N/2;
-    Ray ray = cam.get_ray(tx, ty);
+    Ray ray = cam.get_ray(tx, ty, rnd_x, rnd_y);
     //printdb("Ray", ray);
 
     for(int i = 0; i < num_spheres; ++i){
@@ -39,13 +41,30 @@ __host__ __device__ void RenderImpl(Vector3* img, Camera cam, Sphere* scene, int
     img[tx + N*ty]=(1.0f-t)*Vector3(1.0, 1.0, 1.0) + t*Vector3(0.5, 0.7, 1.0);
 }
 
+__global__ void RenderInit(int max_x, int max_y, curandState *rand_state) {
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    if((i >= max_x) || (j >= max_y)) return;
+    int pixel_index = j*max_x + i;
+    //Each thread gets same seed, a different sequence number, no offset
+    curand_init(1984, pixel_index, 0, &rand_state[pixel_index]);
+}
 
 // GPU version of the same function
-__global__ void Render(Vector3* img, Camera cam, Sphere* scene, int num_spheres){
+__global__ void Render(Vector3* img, Camera cam, Sphere* scene, 
+                    int num_spheres, curandState* rand_state){
     int tx = blockIdx.x*blockDim.x+threadIdx.x;
     int ty = blockIdx.y*blockDim.y+threadIdx.y;
 
-    RenderImpl(img, cam, scene, num_spheres, tx, ty);
+    if((tx >= cam.image_width) || (ty >= cam.get_height())){ 
+        return;
+    }
+
+    int pixel_index = ty*cam.image_width + tx;
+    curandState local_rand_state = rand_state[pixel_index];
+    float rnd_x = curand_uniform(&local_rand_state);
+    float rnd_y = curand_uniform(&local_rand_state); 
+    RenderImpl(img, cam, scene, num_spheres, tx, ty, rnd_x, rnd_y);
 }
 
 void RenderCPU(Vector3* img, Camera cam, Sphere* scene, int num_spheres){
@@ -65,7 +84,9 @@ void RenderCPU(Vector3* img, Camera cam, Sphere* scene, int num_spheres){
         int y1 = min(y0 + tile_size, h);
         for (int y = y0; y < y1; y++) {
             for (int x = x0; x < x1; x++) {
-                RenderImpl(img, cam, scene, num_spheres, x, y);
+                float rnd_x = 0.0f; // TODO
+                float rnd_y = 0.0f;
+                RenderImpl(img, cam, scene, num_spheres, x, y, rnd_x, rnd_y);
             }
         }
     }, Vector2i(num_tiles_x, num_tiles_y));
@@ -86,6 +107,7 @@ int main(int argc, char* argv[]){
     cam.image_width = N;
     cam.lookat = Vector3(0,0,1);
     cam.lookfrom = Vector3(0,0,0);
+
     cam.initialize();
     
     // Set up scene
@@ -127,18 +149,30 @@ int main(int argc, char* argv[]){
         CHECK_CUDA_ERRORS(cudaMalloc(&scene_d, num_spheres*sizeof(Sphere)));
         CHECK_CUDA_ERRORS(cudaMemcpy(scene_d,scene_h,num_spheres*sizeof(Sphere),cudaMemcpyHostToDevice));
 
-        const dim3 blockThreadDist(32, 32);
-        const dim3 numBlocks(
-            N/blockThreadDist.x,
-            N/blockThreadDist.y
+        // allocate random state
+        curandState* rand_state_d;
+        CHECK_CUDA_ERRORS(cudaMalloc((void **)&rand_state_d, N*N*sizeof(curandState)));
+
+        const dim3 threads(32, 32);
+        const dim3 blocks(
+            N/threads.x,
+            N/threads.y
         );
 
         Timer timer;
         tick(timer);
-        Render<<<numBlocks, blockThreadDist>>>(img_d, cam, scene_d, num_spheres);
-        deltaT = tick(timer);
+
+        // *NOTE - this takes almost 5 ms, so see if we can reuse this
+        // state when attempting RT
+        RenderInit<<<blocks, threads>>>(N, N, rand_state_d);
+
         CHECK_CUDA_ERRORS(cudaGetLastError());
         CHECK_CUDA_ERRORS(cudaDeviceSynchronize());
+
+        Render<<<blocks, threads>>>(img_d, cam, scene_d, num_spheres, rand_state_d);
+        CHECK_CUDA_ERRORS(cudaGetLastError());
+        CHECK_CUDA_ERRORS(cudaDeviceSynchronize());
+        deltaT = tick(timer);
 
         // Copy data back to host.
         CHECK_CUDA_ERRORS(cudaMemcpy(img_h, img_d, N*N*sizeof(Vector3), cudaMemcpyDeviceToHost));
