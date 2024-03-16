@@ -6,6 +6,13 @@
 
 #include <fstream>
 #include <iostream>
+#include <random>
+
+float FloatRand(){
+    static std::uniform_real_distribution<float> distribution(0.0, 1.0);
+    static std::mt19937 generator;
+    return distribution(generator);
+}
 
 void WritePPM(const std::string& filename, Vector3* img, int N) {
     std::ofstream outFile(filename);

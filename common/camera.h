@@ -13,7 +13,7 @@ class Camera {
 
     double aspect_ratio      = 1.0;  // Ratio of image width over height
     int    image_width       = 512;  // Rendered image width in pixel count
-    int    samples_per_pixel = 10;   // Count of random samples for each pixel
+    int    samples_per_pixel = 20;   // Count of random samples for each pixel
     int    max_depth         = 10;   // Maximum number of ray bounces into scene
 
     double vfov     = 90;                 // Vertical view angle (field of view)
@@ -65,8 +65,8 @@ void Camera::initialize() {
     printdb("w - into camera", w);
 
     // Calculate the horizontal and vertical delta vectors from pixel to pixel.
-    pixel_delta_u = viewport_u / image_width;
-    pixel_delta_v = viewport_v / image_height;
+    pixel_delta_u = viewport_u / float(image_width);
+    pixel_delta_v = viewport_v / float(image_height);
 
     // Calculate the location of the upper left pixel.
     Vector3 viewport_upper_left = lookfrom - (focal_length * w) - viewport_u/2 - viewport_v/2;
@@ -77,8 +77,8 @@ void Camera::initialize() {
 __host__ __device__ Ray Camera::get_ray(int i, int j, float rnd_i, float rnd_j) const {
         Vector3 pixel_center = pixel00_loc + (i * pixel_delta_u) + (j * pixel_delta_v);
 
-        float px = -0.5f + rnd_i;
-        float py = -0.5f + rnd_j;
+        float px = (-0.5f + rnd_i);
+        float py = (-0.5f + rnd_j);
         Vector3 pixel_sample = pixel_center + px*pixel_delta_u + py*pixel_delta_v;
 
         Vector3 ray_origin = lookfrom;

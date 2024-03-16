@@ -20,25 +20,18 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
     }
 }
 
-__host__ __device__ void RenderImpl(Vector3* img, Camera cam, 
-        Sphere* scene, int num_spheres, int tx, int ty, float rnd_x, float rnd_y){
-    int N = cam.image_width;
-    //tx = N/2;
-    //ty = N/2;
-    Ray ray = cam.get_ray(tx, ty, rnd_x, rnd_y);
-    //printdb("Ray", ray);
-
+__host__ __device__ Vector3 RenderImpl(Vector3* img, Camera cam, 
+        Sphere* scene, int num_spheres, Ray ray){
     for(int i = 0; i < num_spheres; ++i){
         Hit h = collide(ray, scene[i]);
         if (h.hit) {
             //printdb("hit pos", h.position);
-            img[tx + N*ty] = 0.5f*Vector3(h.n.x+1.0f, h.n.y+1.0f, h.n.z+1.0f);
-            return;
+            return 0.5f*Vector3(h.n.x+1.0f, h.n.y+1.0f, h.n.z+1.0f);
         }
     }
 
     float t = 0.5f*(ray.dir.y + 1.0f);
-    img[tx + N*ty]=(1.0f-t)*Vector3(1.0, 1.0, 1.0) + t*Vector3(0.5, 0.7, 1.0);
+    return (1.0f-t)*Vector3(1.0, 1.0, 1.0) + t*Vector3(0.5, 0.7, 1.0);
 }
 
 __global__ void RenderInit(int max_x, int max_y, curandState *rand_state) {
@@ -60,11 +53,18 @@ __global__ void Render(Vector3* img, Camera cam, Sphere* scene,
         return;
     }
 
-    int pixel_index = ty*cam.image_width + tx;
-    curandState local_rand_state = rand_state[pixel_index];
-    float rnd_x = curand_uniform(&local_rand_state);
-    float rnd_y = curand_uniform(&local_rand_state); 
-    RenderImpl(img, cam, scene, num_spheres, tx, ty, rnd_x, rnd_y);
+    Vector3 color(0,0,0);
+    for(int s = 0; s < cam.samples_per_pixel; ++s){
+        int pixel_index = ty*cam.image_width + tx;
+        curandState* local_rand_state = &rand_state[pixel_index];
+        float rnd_x = curand_uniform(local_rand_state);
+        float rnd_y = curand_uniform(local_rand_state);
+        Ray ray = cam.get_ray(tx, ty, rnd_x, rnd_y);
+        color += RenderImpl(img, cam, scene, num_spheres, ray);
+    }
+
+    color = color/float(cam.samples_per_pixel);
+    img[tx + cam.image_width*ty] = color;
 }
 
 void RenderCPU(Vector3* img, Camera cam, Sphere* scene, int num_spheres){
@@ -84,9 +84,15 @@ void RenderCPU(Vector3* img, Camera cam, Sphere* scene, int num_spheres){
         int y1 = min(y0 + tile_size, h);
         for (int y = y0; y < y1; y++) {
             for (int x = x0; x < x1; x++) {
-                float rnd_x = 0.0f; // TODO
-                float rnd_y = 0.0f;
-                RenderImpl(img, cam, scene, num_spheres, x, y, rnd_x, rnd_y);
+                Vector3 color(0,0,0);
+                for(int s = 0; s < cam.samples_per_pixel; ++s){
+                    float rnd_x = next_pcg32_real<float>(rng);
+                    float rnd_y = next_pcg32_real<float>(rng);
+                    Ray ray = cam.get_ray(x, y, rnd_x, rnd_y);
+                    color += RenderImpl(img, cam, scene, num_spheres, ray);
+                }
+                color /= cam.samples_per_pixel;
+                img[x + w*y] = color;
             }
         }
     }, Vector2i(num_tiles_x, num_tiles_y));
@@ -112,8 +118,8 @@ int main(int argc, char* argv[]){
     
     // Set up scene
     std::vector<Sphere> spheres;
-    spheres.push_back(Sphere(Vector3{0,0,5}, 0.5));
-    spheres.push_back(Sphere(Vector3{0,-100.5,-1}, 100));
+    spheres.push_back(Sphere(Vector3{0,0,1}, 0.5));
+    spheres.push_back(Sphere(Vector3{0,-100.5,1}, 100));
     
     const int num_spheres = spheres.size();
     Sphere* scene_h = spheres.data();
