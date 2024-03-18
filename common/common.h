@@ -2,12 +2,10 @@
 #define COMMON_COMMON_H
 #pragma once
 
-#include "camera.h"
-#include "printdb.h"
-#include "ray.h"
-#include "sphere.h"
-#include "timer.h"
-#include "utils.h"
-#include "vector.h"
+#include <limits>
+
+#define __HD__ __host__ __device__
+
+constexpr float max_flt = std::numeric_limits<float>::max();
 
 #endif // COMMON_COMMON_H

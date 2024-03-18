@@ -8,16 +8,17 @@
 #include "vector.h"
 
 #include <cmath>
-#include <limits>
 
 
 struct Sphere {
 
     Sphere() = default;
 
-    __host__ __device__ Sphere(const Vector3& center, float radius) 
+    __HD__ Sphere(const Vector3& center, 
+                                float radius, Material* material) 
         : center(center)
         , radius(radius)
+        , mat_ptr(material)
         {}
 
     Sphere(float x, float y, float z, float r) 
@@ -25,14 +26,18 @@ struct Sphere {
         , radius(r)
         {}
 
+    __HD__ ~Sphere(){
+            printf("deleting sphere\n");
+            delete mat_ptr;
+        }
+
     Vector3 center;
     float radius;
     Material* mat_ptr;
 };
 
 __host__ __device__ Hit collide(const Ray& ray, const Sphere& sphere, 
-                                float tmin = 0, 
-                                float tmax = std::numeric_limits<float>::max()){
+                                float tmin, float tmax){
     Vector3 oc = ray.o - sphere.center;
     float a = dot(ray.dir, ray.dir);
     float half_b = dot(oc, ray.dir);
@@ -56,6 +61,7 @@ __host__ __device__ Hit collide(const Ray& ray, const Sphere& sphere,
     hit.t = root;
     //printf("root: %f\n", root);
     hit.position = ray.at(hit.t);
+    hit.material = sphere.mat_ptr;
     hit.n = (hit.position - sphere.center) / sphere.radius;
 
     return hit;

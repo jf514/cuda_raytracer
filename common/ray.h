@@ -1,13 +1,14 @@
 #ifndef COMMON_RAY_H
 #define COMMON_RAY_H
 
+#include "common.h"
 #include "vector.h"
 
 struct Ray {
 
-    Ray() {}
+    __HD__ Ray() {}
 
-    __host__ __device__ Ray(const Vector3& origin, const Vector3& dir) 
+    __HD__ Ray(const Vector3& origin, const Vector3& dir) 
         : o(origin)
         , dir(dir)
         {}
