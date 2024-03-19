@@ -19,15 +19,20 @@ struct Sphere {
         : center(center)
         , radius(radius)
         , mat_ptr(material)
-        {}
+        {
+            printf("Create sp.\n");
+        }
 
     Sphere(float x, float y, float z, float r) 
         : center(Vector3(x, y, z))
         , radius(r)
-        {}
+        {
+            printf("Create sp. 1\n");
+        }
 
     __HD__ ~Sphere(){
-            printf("deleting sphere\n");
+            static int d = 0;
+            printf("deleting sphere %i\n", d++);
             delete mat_ptr;
         }
 
@@ -36,7 +41,7 @@ struct Sphere {
     Material* mat_ptr;
 };
 
-__host__ __device__ Hit collide(const Ray& ray, const Sphere& sphere, 
+__host__ __device__ inline Hit collide(const Ray& ray, const Sphere& sphere, 
                                 float tmin, float tmax){
     Vector3 oc = ray.o - sphere.center;
     float a = dot(ray.dir, ray.dir);
@@ -44,8 +49,10 @@ __host__ __device__ Hit collide(const Ray& ray, const Sphere& sphere,
     float c = dot(oc, oc) - sphere.radius*sphere.radius;
 
     float discriminant = half_b*half_b - a*c;
+    //printf("disc %f\n", discriminant);
     if (discriminant < 0) return Hit::EmptyHit();
     float sqrtd = sqrt(discriminant);
+    //printf("sqrtd %f\n", sqrtd);
 
     // Find the nearest root that lies in the acceptable range.
     float root = (-half_b - sqrtd) / a;

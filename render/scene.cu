@@ -33,14 +33,16 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
 // it was blowing up the stack, so we have to turn this into a
 // limited-depth loop instead.  Later code in the book limits to a max
 // depth of 50, so we adapt this a few chapters early on the GPU.
-__HD__ Vector3 Color(const Ray& r, World* world, void* rand_state) {
+__HD__ inline Vector3 Color(const Ray& r, World* world, void* rand_state) {
     Ray cur_ray = r;
     Vector3 cur_attenuation = Vector3(1.0,1.0,1.0);
     for(int i = 0; i < 50; i++) {
+        //printf("Color num_sph %i\n", world->num_spheres);
         Hit hit = collideWorld(cur_ray, 0.001f, max_flt, world);
         if (hit.hit) {
             Ray scattered;
             Vector3 attenuation;
+            //printf("Hit\n");
             if(hit.material->scatter(cur_ray, hit, attenuation, scattered, rand_state)) {
                 cur_attenuation *= attenuation;
                 cur_ray = scattered;
@@ -72,13 +74,13 @@ __host__ __device__ Vector3 RenderImpl(Vector3* img, Camera cam,
     return (1.0f-t)*Vector3(1.0, 1.0, 1.0) + t*Vector3(0.5, 0.7, 1.0);
 }
 
-__global__ void RenderInit(int max_x, int max_y, World** world, curandState *rand_state) {
+__global__ void RenderInit(int max_x, int max_y, curandState *rand_state) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
 
-    if((i == 0) && (j == 0)){
-        *world = CreateWorld();
-    }
+    // if((i == 0) && (j == 0)){
+    //     *world = CreateWorld();
+    // }
 
     if((i >= max_x) || (j >= max_y)) 
         return;
@@ -88,15 +90,21 @@ __global__ void RenderInit(int max_x, int max_y, World** world, curandState *ran
     curand_init(1984, pixel_index, 0, &rand_state[pixel_index]);
 }
 
-__global__ void RenderCleanup(World** world){
+__global__ void RenderCleanup(World** world, Sphere** spheres){
+    //delete *spheres;
     delete *world;
 }
 
 // GPU version of the same function
 __global__ void Render(Vector3* img, Camera cam, World** world_d, 
                         curandState* rand_state){
+                        
+ 
     int tx = blockIdx.x*blockDim.x+threadIdx.x;
     int ty = blockIdx.y*blockDim.y+threadIdx.y;
+    
+    if(tx > 511 || ty > 511)
+            printdb("found one.");
 
     if((tx >= cam.image_width) || (ty >= cam.get_height())){ 
         return;
@@ -109,16 +117,20 @@ __global__ void Render(Vector3* img, Camera cam, World** world_d,
         float rnd_x = curand_uniform(local_rand_state);
         float rnd_y = curand_uniform(local_rand_state);
         Ray ray = cam.get_ray(tx, ty, rnd_x, rnd_y);
+        //printf("num_sph %i\n", world_d->num_spheres);
         color += Color(ray, *world_d, local_rand_state);
     }
 
     color = color/float(cam.samples_per_pixel);
-    img[tx + cam.image_width*ty] = color;
+    Vector3 gamma_corrected(sqrt(color.x), sqrt(color.y), sqrt(color.z));
+    img[tx + cam.image_width*ty] = gamma_corrected;
 }
 
 void RenderCPU(Vector3* img, Camera cam, World* world){
     int h = cam.image_width;
     int w = cam.image_width;
+    //printdb("h", cam.get_height());
+    //printdb("w", cam.image_width);
 
     constexpr int tile_size = 16;
     int num_tiles_x = (w + tile_size - 1) / tile_size;
@@ -144,15 +156,17 @@ void RenderCPU(Vector3* img, Camera cam, World* world){
                     color += Color(ray, world, &rng);
                 }
                 color /= cam.samples_per_pixel;
-                img[x + w*y] = color;
+                Vector3 gamma_corrected(sqrt(color.x), sqrt(color.y), sqrt(color.z));
+                img[x + w*y] = gamma_corrected;
             }
         }
     }, Vector2i(num_tiles_x, num_tiles_y));
 }
 
-// __global__ void WorldCreate(World** world){
-//     *world = CreateWorld();
-// }
+ __global__ void WorldCreate(Sphere** spheres, World** world){
+     CreateWorld(spheres, world);
+     printf("Cr wld %i\n", (*world)->num_spheres);
+ }
 
 int main(int argc, char* argv[]){
 
@@ -180,7 +194,9 @@ int main(int argc, char* argv[]){
     if(argc > 1 && std::string(argv[1]) == "-cpu"){
         std::cout << "Rendering on CPU...\n";
 
-        World* w_h = CreateWorld();
+        World* world_h = nullptr; //CreateWorld();
+        Sphere** spheres_h = new Sphere*[4];
+        CreateWorld(spheres_h, &world_h);
  
         //int num_threads = std::thread::hardware_concurrency();
         int num_threads = 50;
@@ -188,29 +204,27 @@ int main(int argc, char* argv[]){
 
         Timer timer;
         tick(timer);
-        RenderCPU(img_h, cam, w_h);
+        RenderCPU(img_h, cam, world_h);
         deltaT = tick(timer);
 
         parallel_cleanup();
     } else {
         std::cout << "Rendering on GPU...\n";
 
-        // Allocate device memory.
-        Vector3 *img_d;
-        CHECK_CUDA_ERRORS(cudaMalloc(&img_d, N*N*sizeof(Vector3)));
+        CheckCuda();
 
-        //Sphere* scene_d;
-        //CHECK_CUDA_ERRORS(cudaMalloc(&scene_d, num_spheres*sizeof(Sphere)));
-        //CHECK_CUDA_ERRORS(cudaMemcpy(scene_d,scene_h,num_spheres*sizeof(Sphere),cudaMemcpyHostToDevice));
+        // Allocate device memory.
+        Vector3* img_d;
+        CHECK_CUDA_ERRORS(cudaMalloc(&img_d, N*N*sizeof(Vector3)));
 
         // allocate random state
         curandState* rand_state_d;
         CHECK_CUDA_ERRORS(cudaMalloc((void **)&rand_state_d, N*N*sizeof(curandState)));
 
-        const dim3 threads(32, 32);
+        const dim3 threads(16, 16);
         const dim3 blocks(
-            N/threads.x,
-            N/threads.y
+            (N)/threads.x,
+            (N)/threads.y
         );
 
         Timer timer;
@@ -219,23 +233,30 @@ int main(int argc, char* argv[]){
         // *NOTE - this takes almost 5 ms, so see if we can reuse this
         // state when attempting RT
         World** world_d;
-        CHECK_CUDA_ERRORS(cudaMalloc(&world_d,sizeof(World**)));
-        //WorldCreate<<<1,1>>>(world_d);
-        RenderInit<<<blocks, threads>>>(N, N, world_d, rand_state_d);
+        CHECK_CUDA_ERRORS(cudaMalloc(&world_d,sizeof(World)));
+        Sphere** spheres_d;
+        CHECK_CUDA_ERRORS(cudaMalloc(&spheres_d,4*sizeof(Sphere*)));
+        WorldCreate<<<1,1>>>(spheres_d, world_d);
+        RenderInit<<<blocks, threads>>>(N, N, rand_state_d);
 
-        CHECK_CUDA_ERRORS(cudaGetLastError());
         CHECK_CUDA_ERRORS(cudaDeviceSynchronize());
+        CHECK_CUDA_ERRORS(cudaGetLastError());
+ 
 
         Render<<<blocks, threads>>>(img_d, cam, world_d, rand_state_d);
+        //Render<<<1, 1>>>(img_d, cam, world_d, rand_state_d);
         CHECK_CUDA_ERRORS(cudaGetLastError());
         CHECK_CUDA_ERRORS(cudaDeviceSynchronize());
+
         deltaT = tick(timer);
 
-        RenderCleanup<<<blocks, threads>>>(world_d);
-        world_d = nullptr;
+        RenderCleanup<<<1, 1>>>(world_d, spheres_d);
+        cudaFree(world_d);
+        cudaFree(spheres_d);
 
         // Copy data back to host.
         CHECK_CUDA_ERRORS(cudaMemcpy(img_h, img_d, N*N*sizeof(Vector3), cudaMemcpyDeviceToHost));
+        CHECK_CUDA_ERRORS(cudaGetLastError());
 
         // Free memory.
         CHECK_CUDA_ERRORS(cudaFree(img_d));

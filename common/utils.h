@@ -42,4 +42,31 @@ void WritePPM(const std::string& filename, Vector3* img, int N) {
     std::cout << "PPM file " << filename << " generated successfully.\n";
 }
 
+void CheckCuda(){
+    cudaDeviceProp prop;
+    int device = 0; // Device number, change this if you want to query properties for a different device
+
+    cudaError_t error = cudaGetDeviceProperties(&prop, device);
+
+    if (error != cudaSuccess) {
+        std::cerr << "Error getting device properties: " << cudaGetErrorString(error) << std::endl;
+        return;
+    }
+
+    std::cout << "Device Name: " << prop.name << std::endl;
+    std::cout << "Total Global Memory: " << prop.totalGlobalMem << " bytes" << std::endl;
+    std::cout << "Shared Memory Per Block: " << prop.sharedMemPerBlock << " bytes" << std::endl;
+    std::cout << "Registers Per Block: " << prop.regsPerBlock << std::endl;
+    std::cout << "Warp Size: " << prop.warpSize << std::endl;
+    std::cout << "Max Threads Per Block: " << prop.maxThreadsPerBlock << std::endl;
+    std::cout << "Max Threads Dimension: [" << prop.maxThreadsDim[0] << ", "
+              << prop.maxThreadsDim[1] << ", " << prop.maxThreadsDim[2] << "]" << std::endl;
+    std::cout << "Max Grid Size: [" << prop.maxGridSize[0] << ", "
+              << prop.maxGridSize[1] << ", " << prop.maxGridSize[2] << "]" << std::endl;
+    std::cout << "Clock Rate: " << prop.clockRate << " kHz" << std::endl;
+    std::cout << "MultiProcessor Count: " << prop.multiProcessorCount << std::endl;
+    std::cout << "Compute Capability: " << prop.major << "." << prop.minor << std::endl;
+
+}
+
 #endif // COMMON_UTILS_H

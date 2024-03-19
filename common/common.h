@@ -8,4 +8,6 @@
 
 constexpr float max_flt = std::numeric_limits<float>::max();
 
+typedef Real double;
+
 #endif // COMMON_COMMON_H

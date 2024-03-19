@@ -13,7 +13,7 @@ class Camera {
 
     double aspect_ratio      = 1.0;  // Ratio of image width over height
     int    image_width       = 512;  // Rendered image width in pixel count
-    int    samples_per_pixel = 20;   // Count of random samples for each pixel
+    int    samples_per_pixel = 500;   // Count of random samples for each pixel
     int    max_depth         = 10;   // Maximum number of ray bounces into scene
 
     double vfov     = 90;                 // Vertical view angle (field of view)
@@ -44,7 +44,7 @@ void Camera::initialize() {
 
     // Determine viewport dimensions.
     float focal_length = length(lookfrom - lookat);
-    float theta = (3.1415926535/180.)*(vfov);
+    float theta = (3.1415926536/180.)*(vfov);
     float h = tan(theta/2);
     float viewport_height = 2 * h * focal_length;
     float viewport_width = viewport_height * (static_cast<double>(image_width)/image_height);
