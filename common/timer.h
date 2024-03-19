@@ -11,10 +11,10 @@ struct Timer {
     std::chrono::time_point<std::chrono::system_clock> last;
 };
 
-inline float tick(Timer &timer) {
+inline Real tick(Timer &timer) {
     std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed = now - timer.last;
-    float ret = elapsed.count();
+    Real ret = elapsed.count();
     timer.last = now;
     return ret;
 }

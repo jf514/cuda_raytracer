@@ -17,7 +17,7 @@ __HD__ void printdb(const char* str){
     printf("%s\n", str);
 }
 
-__HD__ void printdb(const char* str, float val){
+__HD__ void printdb(const char* str, Real val){
     printdb(str);
     printf("%f\n", val);
 }
@@ -40,7 +40,7 @@ __HD__ void printdb(const char* str, const Hit& hit){
     printdb("hit t", hit.t);
 }
 
-__HD__ void printdbln(const char* str, float val){
+__HD__ void printdbln(const char* str, Real val){
     printf("%s: %f", str, val);
 }
 

@@ -15,7 +15,7 @@ struct Sphere {
     Sphere() = default;
 
     __HD__ Sphere(const Vector3& center, 
-                                float radius, Material* material) 
+                                Real radius, Material* material) 
         : center(center)
         , radius(radius)
         , mat_ptr(material)
@@ -23,7 +23,7 @@ struct Sphere {
             printf("Create sp.\n");
         }
 
-    Sphere(float x, float y, float z, float r) 
+    Sphere(Real x, Real y, Real z, Real r) 
         : center(Vector3(x, y, z))
         , radius(r)
         {
@@ -37,25 +37,25 @@ struct Sphere {
         }
 
     Vector3 center;
-    float radius;
+    Real radius;
     Material* mat_ptr;
 };
 
 __host__ __device__ inline Hit collide(const Ray& ray, const Sphere& sphere, 
-                                float tmin, float tmax){
+                                Real tmin, Real tmax){
     Vector3 oc = ray.o - sphere.center;
-    float a = dot(ray.dir, ray.dir);
-    float half_b = dot(oc, ray.dir);
-    float c = dot(oc, oc) - sphere.radius*sphere.radius;
+    Real a = dot(ray.dir, ray.dir);
+    Real half_b = dot(oc, ray.dir);
+    Real c = dot(oc, oc) - sphere.radius*sphere.radius;
 
-    float discriminant = half_b*half_b - a*c;
+    Real discriminant = half_b*half_b - a*c;
     //printf("disc %f\n", discriminant);
     if (discriminant < 0) return Hit::EmptyHit();
-    float sqrtd = sqrt(discriminant);
+    Real sqrtd = sqrt(discriminant);
     //printf("sqrtd %f\n", sqrtd);
 
     // Find the nearest root that lies in the acceptable range.
-    float root = (-half_b - sqrtd) / a;
+    Real root = (-half_b - sqrtd) / a;
     if (root <= tmin || tmax <= root) {
         root = (-half_b + sqrtd) / a;
         if (root <= tmin || tmax <= root)

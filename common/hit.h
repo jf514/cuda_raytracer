@@ -29,7 +29,7 @@ struct Hit {
     // Attenuation
     Vector3 attenuation;
 
-    float t = max_flt;
+    Real t = max_flt;
 
     __host__ __device__ static Hit EmptyHit(){ return Hit(); }
 };

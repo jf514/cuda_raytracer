@@ -8,8 +8,8 @@
 #include <iostream>
 #include <random>
 
-float FloatRand(){
-    static std::uniform_real_distribution<float> distribution(0.0, 1.0);
+Real RealRand(){
+    static std::uniform_real_distribution<Real> distribution(0.0, 1.0);
     static std::mt19937 generator;
     return distribution(generator);
 }

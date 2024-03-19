@@ -6,8 +6,8 @@
 
 #define __HD__ __host__ __device__
 
-constexpr float max_flt = std::numeric_limits<float>::max();
+typedef double Real;
 
-typedef Real double;
+constexpr Real max_flt = std::numeric_limits<Real>::max();
 
 #endif // COMMON_COMMON_H

@@ -20,9 +20,9 @@ __HD__ Vector3 GetRandVec3(void* rand_state){
     #else
         auto rng = reinterpret_cast<pcg32_state*>(rand_state);
         return Vector3(
-                    next_pcg32_real<float>(*rng),
-                    next_pcg32_real<float>(*rng),
-                    next_pcg32_real<float>(*rng));
+                    next_pcg32_real<Real>(*rng),
+                    next_pcg32_real<Real>(*rng),
+                    next_pcg32_real<Real>(*rng));
     #endif
 }
 
@@ -63,7 +63,7 @@ class Lambertian : public Material {
 
 class Metal : public Material {
     public:
-        __HD__ Metal(const Vector3& a, float f) : albedo(a) { if (f < 1) fuzz = f; else fuzz = 1; }
+        __HD__ Metal(const Vector3& a, Real f) : albedo(a) { if (f < 1) fuzz = f; else fuzz = 1; }
         
         __HD__ virtual bool scatter(const Ray& r_in, const Hit& rec, 
                                     Vector3& attenuation, Ray& scattered, 
@@ -75,7 +75,7 @@ class Metal : public Material {
         }
 
         Vector3 albedo;
-        float fuzz;
+        Real fuzz;
 };
 
 #endif

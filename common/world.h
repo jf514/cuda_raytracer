@@ -77,7 +77,7 @@ __HD__ void CreateWorld(Sphere** spheres, World** world) {
 }
 
 
-__HD__ Hit collideWorld(const Ray& ray, float t_min, float t_max, World* world){
+__HD__ Hit collideWorld(const Ray& ray, Real t_min, Real t_max, World* world){
     //printf("cw num_sph %i\n", world->num_spheres);
     // Closest hit
     Hit h_closest;

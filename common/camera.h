@@ -21,7 +21,7 @@ class Camera {
     Vector3 lookat   = Vector3(0,0,-1);   // Point camera is looking at
     Vector3   vup    = Vector3(0,1,0);    // Camera-relative "up" direction
     
-    __host__ __device__ Ray get_ray(int i, int j, float rnd_i, float rnd_j) const;
+    __host__ __device__ Ray get_ray(int i, int j, Real rnd_i, Real rnd_j) const;
 
     void initialize();
 
@@ -43,11 +43,11 @@ void Camera::initialize() {
     center = lookfrom;
 
     // Determine viewport dimensions.
-    float focal_length = length(lookfrom - lookat);
-    float theta = (3.1415926536/180.)*(vfov);
-    float h = tan(theta/2);
-    float viewport_height = 2 * h * focal_length;
-    float viewport_width = viewport_height * (static_cast<double>(image_width)/image_height);
+    Real focal_length = length(lookfrom - lookat);
+    Real theta = (3.1415926536/180.)*(vfov);
+    Real h = tan(theta/2);
+    Real viewport_height = 2 * h * focal_length;
+    Real viewport_width = viewport_height * (static_cast<double>(image_width)/image_height);
 
     // Calculate the u,v,w unit basis vectors for the camera coordinate frame.
     w = -normalize(lookat - lookfrom);  // Into the camera
@@ -65,8 +65,8 @@ void Camera::initialize() {
     printdb("w - into camera", w);
 
     // Calculate the horizontal and vertical delta vectors from pixel to pixel.
-    pixel_delta_u = viewport_u / float(image_width);
-    pixel_delta_v = viewport_v / float(image_height);
+    pixel_delta_u = viewport_u / Real(image_width);
+    pixel_delta_v = viewport_v / Real(image_height);
 
     // Calculate the location of the upper left pixel.
     Vector3 viewport_upper_left = lookfrom - (focal_length * w) - viewport_u/2 - viewport_v/2;
@@ -74,11 +74,11 @@ void Camera::initialize() {
 }
 
 
-__host__ __device__ Ray Camera::get_ray(int i, int j, float rnd_i, float rnd_j) const {
+__host__ __device__ Ray Camera::get_ray(int i, int j, Real rnd_i, Real rnd_j) const {
         Vector3 pixel_center = pixel00_loc + (i * pixel_delta_u) + (j * pixel_delta_v);
 
-        float px = (-0.5f + rnd_i);
-        float py = (-0.5f + rnd_j);
+        Real px = (-0.5f + rnd_i);
+        Real py = (-0.5f + rnd_j);
         Vector3 pixel_sample = pixel_center + px*pixel_delta_u + py*pixel_delta_v;
 
         Vector3 ray_origin = lookfrom;

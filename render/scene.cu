@@ -52,7 +52,7 @@ __HD__ inline Vector3 Color(const Ray& r, World* world, void* rand_state) {
             }
         }
         else {
-            float t = 0.5f*(cur_ray.dir.y + 1.0f);
+            Real t = 0.5f*(cur_ray.dir.y + 1.0f);
             Vector3 c = (1.0f-t)*Vector3(1.0, 1.0, 1.0) + t*Vector3(0.5, 0.7, 1.0);
             return cur_attenuation * c;
         }
@@ -70,7 +70,7 @@ __host__ __device__ Vector3 RenderImpl(Vector3* img, Camera cam,
         }
     }
 
-    float t = 0.5f*(ray.dir.y + 1.0f);
+    Real t = 0.5f*(ray.dir.y + 1.0f);
     return (1.0f-t)*Vector3(1.0, 1.0, 1.0) + t*Vector3(0.5, 0.7, 1.0);
 }
 
@@ -114,14 +114,14 @@ __global__ void Render(Vector3* img, Camera cam, World** world_d,
     for(int s = 0; s < cam.samples_per_pixel; ++s){
         int pixel_index = ty*cam.image_width + tx;
         curandState* local_rand_state = &rand_state[pixel_index];
-        float rnd_x = curand_uniform(local_rand_state);
-        float rnd_y = curand_uniform(local_rand_state);
+        Real rnd_x = curand_uniform(local_rand_state);
+        Real rnd_y = curand_uniform(local_rand_state);
         Ray ray = cam.get_ray(tx, ty, rnd_x, rnd_y);
         //printf("num_sph %i\n", world_d->num_spheres);
         color += Color(ray, *world_d, local_rand_state);
     }
 
-    color = color/float(cam.samples_per_pixel);
+    color = color/Real(cam.samples_per_pixel);
     Vector3 gamma_corrected(sqrt(color.x), sqrt(color.y), sqrt(color.z));
     img[tx + cam.image_width*ty] = gamma_corrected;
 }
@@ -150,8 +150,8 @@ void RenderCPU(Vector3* img, Camera cam, World* world){
             for (int x = x0; x < x1; x++) {
                 Vector3 color(0,0,0);
                 for(int s = 0; s < cam.samples_per_pixel; ++s){
-                    float rnd_x = next_pcg32_real<float>(rng);
-                    float rnd_y = next_pcg32_real<float>(rng);
+                    Real rnd_x = next_pcg32_real<Real>(rng);
+                    Real rnd_y = next_pcg32_real<Real>(rng);
                     Ray ray = cam.get_ray(x, y, rnd_x, rnd_y);
                     color += Color(ray, world, &rng);
                 }
@@ -190,7 +190,7 @@ int main(int argc, char* argv[]){
     Vector3* img_h = new Vector3[N*N];
 
     // Render on GPU or CPU?
-    float deltaT = 0;
+    Real deltaT = 0;
     if(argc > 1 && std::string(argv[1]) == "-cpu"){
         std::cout << "Rendering on CPU...\n";
 
