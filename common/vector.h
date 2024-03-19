@@ -2,6 +2,8 @@
 #define COMMON_VECTOR3_H
 #pragma once
 
+#include "common.h"
+
 #include <algorithm>
 #include <math.h>
 #include <cmath>
