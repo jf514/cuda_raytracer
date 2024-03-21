@@ -36,44 +36,21 @@ struct World {
     int num_spheres = 0;
 };
 
-// __HD__ World* CreateWorld(){
- 
-//     printf("Create world!\n");
-
-//     int num_spheres = 2;
-//     Sphere* spheres = new Sphere[num_spheres];
-
-//     new(&spheres[0]) Sphere{
-//                             Vector3{2,0,3},1.0,
-//                             new Lambertian{Vector3{.8,.8,.3}}
-//                         };
-
-//     new(&spheres[1]) Sphere{
-//                             Vector3{-2,0,3},1.0,
-//                             new Metal{Vector3(.8,.8,.8), .3}
-//                         };
-
-//     printf("Create world!!\n");
-
-//     World* w = new World(spheres, num_spheres);
-//     printf("w = %p\n", w);
-
-//     return w;
-
-// }
-
 __HD__ void CreateWorld(Sphere** spheres, World** world) {
 
-    //printf("New CreateWorld\n");
-    spheres[0] = new Sphere(Vector3(0,0,2), 0.5,
-                            new Lambertian(Vector3(0.8, 0.3, 0.3)));
-    spheres[1] = new Sphere(Vector3(0,-100.5,2), 100,
+    spheres[0] = new Sphere(Vector3(0,0,1), 0.5,
+                            new Lambertian(Vector3(0.1, 0.2, 0.5)));
+    spheres[1] = new Sphere(Vector3(0,-100.5,1), 100,
                             new Lambertian(Vector3(0.8, 0.8, 0.0)));
-    spheres[2] = new Sphere(Vector3(1,0,2), 0.5,
-                            new Metal(Vector3(0.8, 0.6, 0.2), 1.0));
-    spheres[3] = new Sphere(Vector3(-1,0,2), 0.5,
-                            new Metal(Vector3(0.8, 0.8, 0.8), 0.3));
+    spheres[2] = new Sphere(Vector3(1,0,1), 0.5,
+                            new Metal(Vector3(0.8, 0.6, 0.2), 0.0));
+    spheres[3] = new Sphere(Vector3(-1,0,1), 0.5,
+                                new Dielectric(1.5));
+    spheres[4] = new Sphere(Vector3(-1,0,1), -0.45,
+                                new Dielectric(1.5));
+ 
     *world  = new World(spheres,4);
+
 }
 
 

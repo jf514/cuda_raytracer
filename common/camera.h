@@ -13,11 +13,11 @@ class Camera {
 
     double aspect_ratio      = 1.0;  // Ratio of image width over height
     int    image_width       = 512;  // Rendered image width in pixel count
-    int    samples_per_pixel = 500;   // Count of random samples for each pixel
-    int    max_depth         = 10;   // Maximum number of ray bounces into scene
+    int    samples_per_pixel = 25;   // Count of random samples for each pixel
+    int    max_depth         = 50;   // Maximum number of ray bounces into scene
 
     double vfov     = 90;                 // Vertical view angle (field of view)
-    Vector3 lookfrom = Vector3(0,0,1);   // Point camera is looking from
+    Vector3 lookfrom = Vector3(0,0,10);   // Point camera is looking from
     Vector3 lookat   = Vector3(0,0,-1);   // Point camera is looking at
     Vector3   vup    = Vector3(0,1,0);    // Camera-relative "up" direction
     
@@ -59,7 +59,7 @@ void Camera::initialize() {
     Vector3 viewport_v = viewport_height * -v;  // Vector down viewport vertical edge
 
     printdb("lookat", lookat);
-    printdb("lookfrom", lookfrom);
+    printdb("lookfromm", lookfrom);
     printdb("u - cam right", viewport_u);
     printdb("v - cam up", viewport_v);
     printdb("w - into camera", w);

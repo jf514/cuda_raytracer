@@ -6,7 +6,7 @@
 
 #define __HD__ __host__ __device__
 
-typedef double Real;
+typedef float Real;
 
 constexpr Real max_flt = std::numeric_limits<Real>::max();
 

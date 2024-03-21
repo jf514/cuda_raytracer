@@ -33,13 +33,18 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
 // it was blowing up the stack, so we have to turn this into a
 // limited-depth loop instead.  Later code in the book limits to a max
 // depth of 50, so we adapt this a few chapters early on the GPU.
-__HD__ inline Vector3 Color(const Ray& r, World* world, void* rand_state) {
+__HD__ inline Vector3 Color(const Ray& r, World* world, Camera* cam, void* rand_state) {
     Ray cur_ray = r;
     Vector3 cur_attenuation = Vector3(1.0,1.0,1.0);
-    for(int i = 0; i < 50; i++) {
+    for(int i = 0; i < cam->max_depth; i++) {
         //printf("Color num_sph %i\n", world->num_spheres);
         Hit hit = collideWorld(cur_ray, 0.001f, max_flt, world);
         if (hit.hit) {
+
+
+            scatter_rec srec;
+            Vector3 color_from_emission = hit.mat_ptr->emit(r, hit);
+
             Ray scattered;
             Vector3 attenuation;
             //printf("Hit\n");
@@ -118,7 +123,7 @@ __global__ void Render(Vector3* img, Camera cam, World** world_d,
         Real rnd_y = curand_uniform(local_rand_state);
         Ray ray = cam.get_ray(tx, ty, rnd_x, rnd_y);
         //printf("num_sph %i\n", world_d->num_spheres);
-        color += Color(ray, *world_d, local_rand_state);
+        color += Color(ray, *world_d, &cam, local_rand_state);
     }
 
     color = color/Real(cam.samples_per_pixel);
@@ -153,7 +158,7 @@ void RenderCPU(Vector3* img, Camera cam, World* world){
                     Real rnd_x = next_pcg32_real<Real>(rng);
                     Real rnd_y = next_pcg32_real<Real>(rng);
                     Ray ray = cam.get_ray(x, y, rnd_x, rnd_y);
-                    color += Color(ray, world, &rng);
+                    color += Color(ray, world, &cam, &rng);
                 }
                 color /= cam.samples_per_pixel;
                 Vector3 gamma_corrected(sqrt(color.x), sqrt(color.y), sqrt(color.z));
@@ -182,7 +187,7 @@ int main(int argc, char* argv[]){
     Camera cam;
     cam.image_width = N;
     cam.lookat = Vector3(0,0,1);
-    cam.lookfrom = Vector3(0,0,0);
+    cam.lookfrom = Vector3(0,2,2);
 
     cam.initialize();
        
@@ -195,7 +200,7 @@ int main(int argc, char* argv[]){
         std::cout << "Rendering on CPU...\n";
 
         World* world_h = nullptr; //CreateWorld();
-        Sphere** spheres_h = new Sphere*[4];
+        Sphere** spheres_h = new Sphere*[5];
         CreateWorld(spheres_h, &world_h);
  
         //int num_threads = std::thread::hardware_concurrency();
@@ -227,26 +232,27 @@ int main(int argc, char* argv[]){
             (N)/threads.y
         );
 
-        Timer timer;
-        tick(timer);
+ 
 
         // *NOTE - this takes almost 5 ms, so see if we can reuse this
         // state when attempting RT
         World** world_d;
         CHECK_CUDA_ERRORS(cudaMalloc(&world_d,sizeof(World)));
         Sphere** spheres_d;
-        CHECK_CUDA_ERRORS(cudaMalloc(&spheres_d,4*sizeof(Sphere*)));
+        CHECK_CUDA_ERRORS(cudaMalloc(&spheres_d,5*sizeof(Sphere*)));
         WorldCreate<<<1,1>>>(spheres_d, world_d);
         RenderInit<<<blocks, threads>>>(N, N, rand_state_d);
 
         CHECK_CUDA_ERRORS(cudaDeviceSynchronize());
         CHECK_CUDA_ERRORS(cudaGetLastError());
  
+        Timer timer;
+        tick(timer);
 
         Render<<<blocks, threads>>>(img_d, cam, world_d, rand_state_d);
         //Render<<<1, 1>>>(img_d, cam, world_d, rand_state_d);
         CHECK_CUDA_ERRORS(cudaGetLastError());
-        CHECK_CUDA_ERRORS(cudaDeviceSynchronize());
+        //CHECK_CUDA_ERRORS(cudaDeviceSynchronize());
 
         deltaT = tick(timer);
 
