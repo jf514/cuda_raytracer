@@ -39,17 +39,17 @@ struct World {
 __HD__ void CreateWorld(Sphere** spheres, World** world) {
 
     spheres[0] = new Sphere(Vector3(0,0,1), 0.5,
-                            new Lambertian(Vector3(0.1, 0.2, 0.5)));
+                            new lambertian(Vector3(0.1, 0.2, 0.5)));
     spheres[1] = new Sphere(Vector3(0,-100.5,1), 100,
-                            new Lambertian(Vector3(0.8, 0.8, 0.0)));
+                            new lambertian(Vector3(0.8, 0.8, 0.0)));
     spheres[2] = new Sphere(Vector3(1,0,1), 0.5,
-                            new Metal(Vector3(0.8, 0.6, 0.2), 0.0));
+                            new metal(Vector3(0.8, 0.6, 0.2), 0.0));
     spheres[3] = new Sphere(Vector3(-1,0,1), 0.5,
-                                new Dielectric(1.5));
+                                new dielectric(1.5));
     spheres[4] = new Sphere(Vector3(-1,0,1), -0.45,
-                                new Dielectric(1.5));
+                                new dielectric(1.5));
  
-    *world  = new World(spheres,4);
+    *world  = new World(spheres,5);
 
 }
 

@@ -236,6 +236,18 @@ struct Vector4 {
     return (v.x + v.y + v.z) / 3;
 }
 
+__HD__ inline Vector3 reflect(const Vector3& v, const Vector3& n) {
+    return v - 2*dot(v,n)*n;
+}
+
+__HD__ inline Vector3 refract(const Vector3& uv, const Vector3& n, double etai_over_etat) {
+    auto cos_theta = min(dot(-uv, n), 1.0);
+    vec3 r_out_perp =  etai_over_etat * (uv + cos_theta*n);
+    vec3 r_out_parallel = -sqrt(fabs(1.0 - length_squared(r_out_perp))) * n;
+    return r_out_perp + r_out_parallel;
+}
+
+
 //     __host__ __device__ inline Real max(const Vector3 &v) {
 //     return std::max(std::max(v.x, v.y), v.z);
 // }

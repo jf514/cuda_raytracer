@@ -1,8 +1,10 @@
 #include "camera.h"
 #include "common.h"
 #include "hit.h"
+#include "material.h"
 #include "parallel.h"
 #include "pcg.h"
+#include "pdf.h"
 #include "ray.h"
 #include "sphere.h"
 #include "timer.h"
@@ -34,34 +36,42 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
 // limited-depth loop instead.  Later code in the book limits to a max
 // depth of 50, so we adapt this a few chapters early on the GPU.
 __HD__ inline Vector3 Color(const Ray& r, World* world, Camera* cam, void* rand_state) {
-    Ray cur_ray = r;
-    Vector3 cur_attenuation = Vector3(1.0,1.0,1.0);
-    for(int i = 0; i < cam->max_depth; i++) {
-        //printf("Color num_sph %i\n", world->num_spheres);
-        Hit hit = collideWorld(cur_ray, 0.001f, max_flt, world);
-        if (hit.hit) {
+    // Ray cur_ray = r;
+    // Vector3 cur_attenuation = Vector3(1.0,1.0,1.0);
+    // for(int depth = 0; depth < cam->max_depth; depth++) {
+    //     //printf("Color num_sph %i\n", world->num_spheres);
+    //     Hit rec = collideWorld(cur_ray, 0.001f, max_flt, world);
+    //     if (rec.hit) {
 
+    //         scatter_record srec;
+    //         Vector3 color_from_emission = rec.material->emitted(r, rec, rec.u, rec.v, rec.position);
 
-            scatter_rec srec;
-            Vector3 color_from_emission = hit.mat_ptr->emit(r, hit);
+    //         if (!rec.material->scatter(r, rec, srec, rand_state))
+    //         return color_from_emission;
 
-            Ray scattered;
-            Vector3 attenuation;
-            //printf("Hit\n");
-            if(hit.material->scatter(cur_ray, hit, attenuation, scattered, rand_state)) {
-                cur_attenuation *= attenuation;
-                cur_ray = scattered;
-            }
-            else {
-                return Vector3(0.0,0.0,0.0);
-            }
-        }
-        else {
-            Real t = 0.5f*(cur_ray.dir.y + 1.0f);
-            Vector3 c = (1.0f-t)*Vector3(1.0, 1.0, 1.0) + t*Vector3(0.5, 0.7, 1.0);
-            return cur_attenuation * c;
-        }
-    }
+    //         // TODOTOTOTOTOTODODO
+    //         // if (srec.skip_pdf) {
+    //         //     return srec.attenuation * ray_color(srec.skip_pdf_ray, depth-1, world, lights);
+    //         // }
+
+    //         Ray scattered = Ray(rec.position, srec.pdf_ptr->generate(rand_state));
+    //         auto pdf_val = srec.pdf_ptr->value(scattered.dir);
+
+    //         // Need - nothing!
+    //         double scattering_pdf = rec.material->scattering_pdf(r, rec, scattered);
+
+    //         //color sample_color = ray_color(scattered, depth-1, world, lights);
+    //         color sample_color;
+    //         color color_from_scatter = (srec.attenuation * scattering_pdf * sample_color) / pdf_val;
+
+    //         return color_from_emission + color_from_scatter;
+    //     }
+    //     else {
+    //         Real t = 0.5f*(cur_ray.dir.y + 1.0f);
+    //         Vector3 c = (1.0f-t)*Vector3(1.0, 1.0, 1.0) + t*Vector3(0.5, 0.7, 1.0);
+    //         return cur_attenuation * c;
+    //     }
+    // }
     return Vector3(0.0,0.0,0.0); // exceeded recursion
 }
 
@@ -105,30 +115,30 @@ __global__ void Render(Vector3* img, Camera cam, World** world_d,
                         curandState* rand_state){
                         
  
-    int tx = blockIdx.x*blockDim.x+threadIdx.x;
-    int ty = blockIdx.y*blockDim.y+threadIdx.y;
+    // int tx = blockIdx.x*blockDim.x+threadIdx.x;
+    // int ty = blockIdx.y*blockDim.y+threadIdx.y;
     
-    if(tx > 511 || ty > 511)
-            printdb("found one.");
+    // if(tx > 511 || ty > 511)
+    //         printdb("found one.");
 
-    if((tx >= cam.image_width) || (ty >= cam.get_height())){ 
-        return;
-    }
+    // if((tx >= cam.image_width) || (ty >= cam.get_height())){ 
+    //     return;
+    // }
 
-    Vector3 color(0,0,0);
-    for(int s = 0; s < cam.samples_per_pixel; ++s){
-        int pixel_index = ty*cam.image_width + tx;
-        curandState* local_rand_state = &rand_state[pixel_index];
-        Real rnd_x = curand_uniform(local_rand_state);
-        Real rnd_y = curand_uniform(local_rand_state);
-        Ray ray = cam.get_ray(tx, ty, rnd_x, rnd_y);
-        //printf("num_sph %i\n", world_d->num_spheres);
-        color += Color(ray, *world_d, &cam, local_rand_state);
-    }
+    // Vector3 color(0,0,0);
+    // for(int s = 0; s < cam.samples_per_pixel; ++s){
+    //     int pixel_index = ty*cam.image_width + tx;
+    //     curandState* local_rand_state = &rand_state[pixel_index];
+    //     Real rnd_x = curand_uniform(local_rand_state);
+    //     Real rnd_y = curand_uniform(local_rand_state);
+    //     Ray ray = cam.get_ray(tx, ty, rnd_x, rnd_y);
+    //     //printf("num_sph %i\n", world_d->num_spheres);
+    //     color += Color(ray, *world_d, &cam, local_rand_state);
+    // }
 
-    color = color/Real(cam.samples_per_pixel);
-    Vector3 gamma_corrected(sqrt(color.x), sqrt(color.y), sqrt(color.z));
-    img[tx + cam.image_width*ty] = gamma_corrected;
+    // color = color/Real(cam.samples_per_pixel);
+    // Vector3 gamma_corrected(sqrt(color.x), sqrt(color.y), sqrt(color.z));
+    // img[tx + cam.image_width*ty] = gamma_corrected;
 }
 
 void RenderCPU(Vector3* img, Camera cam, World* world){
@@ -241,7 +251,7 @@ int main(int argc, char* argv[]){
         Sphere** spheres_d;
         CHECK_CUDA_ERRORS(cudaMalloc(&spheres_d,5*sizeof(Sphere*)));
         WorldCreate<<<1,1>>>(spheres_d, world_d);
-        RenderInit<<<blocks, threads>>>(N, N, rand_state_d);
+        // RenderInit<<<blocks, threads>>>(N, N, rand_state_d);
 
         CHECK_CUDA_ERRORS(cudaDeviceSynchronize());
         CHECK_CUDA_ERRORS(cudaGetLastError());

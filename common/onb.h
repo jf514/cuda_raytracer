@@ -1,5 +1,5 @@
-#ifndef PDF_H
-#define PDF_H
+#ifndef ONB_H
+#define ONB_H
 //==============================================================================================
 // Originally written in 2016 by Peter Shirley <ptrshrl@gmail.com>
 //
@@ -11,91 +11,40 @@
 // along with this software. If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
 //==============================================================================================
 
+//#include "rtweekend.h"
 #include "common.h"
-#include "onb.h"
 
-
-class pdf {
+class onb {
   public:
-    virtual ~pdf() {}
+   __HD__  onb() {}
 
-    virtual Real value(const Vector3& direction) const = 0;
-    virtual Vector3 generate() const = 0;
-};
+     __HD__ vec3 operator[](int i) const { return axis[i]; }
+     __HD__ vec3& operator[](int i) { return axis[i]; }
 
+    __HD__ vec3 u() const { return axis[0]; }
+    __HD__ vec3 v() const { return axis[1]; }
+    __HD__ vec3 w() const { return axis[2]; }
 
-class cosine_pdf : public pdf {
-  public:
-    cosine_pdf(const Vector3& w) { uvw.build_from_w(w); }
-
-    Real value(const Vector3& direction) const override {
-        auto cosine_theta = dot(normalize(direction), uvw.w());
-        return fmax(0, cosine_theta/pi);
+    __HD__ vec3 local(double a, double b, double c) const {
+        return a*u() + b*v() + c*w();
     }
 
-    Vector3 generate() const override {
-        return uvw.local(random_cosine_direction());
+    __HD__ vec3 local(const vec3& a) const {
+        return a.x*u() + a.y*v() + a.z*w();
+    }
+
+    __HD__ void build_from_w(const vec3& w) {
+        vec3 unit_w = normalize(w);
+        vec3 a = (fabs(unit_w.x) > 0.9) ? vec3(0,1,0) : vec3(1,0,0);
+        vec3 v = normalize(cross(unit_w, a));
+        vec3 u = cross(unit_w, v);
+        axis[0] = u;
+        axis[1] = v;
+        axis[2] = unit_w;
     }
 
   private:
-    onb uvw;
-};
-
-
-class sphere_pdf : public pdf {
-  public:
-    sphere_pdf() { }
-
-    Real value(const Vector3& direction) const override {
-        return 1/ (4 * pi);
-    }
-
-    Vector3 generate() const override {
-        return random_unit_vector();
-    }
-};
-
-
-class hittable_pdf : public pdf {
-  public:
-    hittable_pdf(const hittable& _objects, const Vector3& _origin)
-      : objects(_objects), origin(_origin)
-    {}
-
-    Real value(const Vector3& direction) const override {
-        return objects.pdf_value(origin, direction);
-    }
-
-    Vector3 generate() const override {
-        return objects.random(origin);
-    }
-
-  private:
-    const hittable& objects;
-    Vector3 origin;
-};
-
-
-class mixture_pdf : public pdf {
-  public:
-    mixture_pdf(pdf* p0, pdf* p1) {
-        p[0] = p0;
-        p[1] = p1;
-    }
-
-    Real value(const Vector3& direction) const override {
-        return 0.5 * p[0]->value(direction) + 0.5 *p[1]->value(direction);
-    }
-
-    Vector3 generate() const override {
-        if (random_Real() < 0.5)
-            return p[0]->generate();
-        else
-            return p[1]->generate();
-    }
-
-  private:
-    pdf* p[2];
+    vec3 axis[3];
 };
 
 

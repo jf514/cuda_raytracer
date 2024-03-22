@@ -4,7 +4,9 @@
 
 #include "hit.h"
 #include "pcg.h"
+#include "pdf.h"
 #include "ray.h"
+#include "texture.h"
 
 #include <curand_kernel.h>
 
@@ -13,155 +15,147 @@ class scatter_record {
     Vector3 attenuation;
     pdf* pdf_ptr;
     bool skip_pdf;
-    Ray skip_pdf_ray;
+    Ray skip_pdf_Ray;
 };
 
-
-__HD__ Real schlick(Real cosine, Real ref_idx) {
-    Real r0 = (1.0f-ref_idx) / (1.0f+ref_idx);
-    r0 = r0*r0;
-    return r0 + (1.0f-r0)*pow((1.0f - cosine),5.0f);
-}
-
-__HD__ bool refract(const Vector3& v, const Vector3& n, Real ni_over_nt, Vector3& refracted) {
-    Vector3 uv = normalize(v);
-    Real dt = dot(uv, n);
-    Real discriminant = 1.0f - ni_over_nt*ni_over_nt*(1-dt*dt);
-    if (discriminant > 0) {
-        refracted = ni_over_nt*(uv - n*dt) - n*sqrt(discriminant);
-        return true;
-    }
-    else
-        return false;
-}
-
-__HD__ inline Real NextRand(void* rand_state){
-#ifdef __CUDA_ARCH__
-    auto local_rand_state = reinterpret_cast<curandState*>(rand_state);
-    return curand_uniform(local_rand_state);
-#else
-    auto rng = reinterpret_cast<pcg32_state*>(rand_state);
-    return next_pcg32_real<Real>(*rng);
-#endif
-}
-
-__HD__ inline Vector3 GetRandVec3(void* rand_state){
-    return Vector3(NextRand(rand_state),
-            NextRand(rand_state),
-            NextRand(rand_state));
-}
-
-__HD__ Vector3 random_in_unit_sphere(void* rand_state) {
-    Vector3 p;
-    do {
-        p = 2.0f*GetRandVec3(rand_state) - Vector3(1,1,1);
-    } while (dot(p,p) >= 1.0f);
-    return p;
-}
-
-__HD__ Vector3 reflect(const Vector3& v, const Vector3& n) {
-     return v - 2.0f*dot(v,n)*n;
-}
-
-class Material  {
-    public:
-
-        __HD__ virtual Vector3 emit(
-            const Ray& r_in, const Hit& rec) const {
-            return Vector3(0,0,0);
-        }
-
-        __HD__ virtual bool scatter(const Ray& r_in, const Hit& rec, 
-            Vector3& attenuation, Ray& scattered, void* rand_state) const = 0;
-};
-
-class Lambertian : public Material {
-    public:
-        __HD__ Lambertian(const Vector3& a) : albedo(a) {}
-
-        __HD__ virtual bool scatter(const Ray& r_in, const Hit& rec, 
-                                    Vector3& attenuation, Ray& scattered, 
-                                    void* rand_state) const  {
-             Vector3 target = rec.position + rec.n + random_in_unit_sphere(rand_state);
-             scattered = Ray(rec.position, target-rec.position);
-             attenuation = albedo;
-             return true;
-        }
-
-        Vector3 albedo;
-};
-
-class Metal : public Material {
-    public:
-        __HD__ Metal(const Vector3& a, Real f) : albedo(a) { if (f < 1) fuzz = f; else fuzz = 1; }
-        
-        __HD__ virtual bool scatter(const Ray& r_in, const Hit& rec, 
-                                    Vector3& attenuation, Ray& scattered, 
-                                    void* rand_state) const  {
-            Vector3 reflected = reflect(normalize(r_in.dir), rec.n);
-            scattered = Ray(rec.position, reflected + fuzz*random_in_unit_sphere(rand_state));
-            attenuation = albedo;
-            return (dot(scattered.dir, rec.n) > 0.0f);
-        }
-
-        Vector3 albedo;
-        Real fuzz;
-};
-
-class Dielectric : public Material {
-public:
-    __HD__ Dielectric(Real ri) : ref_idx(ri) {}
-    __HD__ virtual bool scatter(const Ray& r_in,
-                         const Hit& rec,
-                         Vector3& attenuation,
-                         Ray& scattered,
-                         void* rand_state) const  {
-        Vector3 outward_normal;
-        Vector3 reflected = reflect(r_in.dir, rec.n);
-        Real ni_over_nt;
-        attenuation = Vector3(1.0, 1.0, 1.0);
-        Vector3 refracted;
-        Real reflect_prob;
-        Real cosine;
-        if (dot(r_in.dir, rec.n) > 0.0f) {
-            outward_normal = -rec.n;
-            ni_over_nt = ref_idx;
-            cosine = dot(r_in.dir, rec.n) / length(r_in.dir);
-            cosine = sqrt(1.0f - ref_idx*ref_idx*(1-cosine*cosine));
-        }
-        else {
-            outward_normal = rec.n;
-            ni_over_nt = 1.0f / ref_idx;
-            cosine = -dot(r_in.dir, rec.n) / length(r_in.dir);
-        }
-        if (refract(r_in.dir, outward_normal, ni_over_nt, refracted))
-            reflect_prob = schlick(cosine, ref_idx);
-        else
-            reflect_prob = 1.0f;
-        if (NextRand(rand_state) < reflect_prob)
-            scattered = Ray(rec.position, reflected);
-        else
-            scattered = Ray(rec.position, refracted);
-        return true;
-    }
-
-    Real ref_idx;
-};
-
-class DiffuseLight : public Material {
+class Material {
   public:
-    __HD__ DiffuseLight(Vector3 c) : color(c) {}
+    virtual ~Material() = default;
 
-    __HD__ Vector3 emit(const Ray& r_in, const Hit& rec)
-    const override {
-        // Hitting front face
-        if (dot(rec.n, r_in.dir) > 0)
-            return Vector3(0,0,0);
-        return color;
+     __HD__ virtual Vector3 emitted(
+        const Ray& r_in, const hit_record& rec, double u, double v, const point3& p
+    ) const {
+        return Vector3(0,0,0);
+    }
+
+     __HD__ virtual bool scatter(const Ray& r_in, const hit_record& rec, scatter_record& srec, void* rand_state) const {
+        return false;
+    }
+
+     __HD__ virtual double scattering_pdf(const Ray& r_in, const hit_record& rec, const Ray& scattered)
+    const {
+        return 0;
+    }
+};
+
+// JEF Todo FIX MEMORY LEAKS
+class lambertian : public Material {
+  public:
+     __HD__ lambertian(const Vector3& a) : albedo(new solid_color(a)) {}
+     __HD__ lambertian(texture* a) : albedo(a) {}
+
+     __HD__ bool scatter(const Ray& r_in, const hit_record& rec, scatter_record& srec, void* rand_state) const override {
+        srec.attenuation = albedo->value(rec.u, rec.v, rec.position);
+        srec.pdf_ptr = new cosine_pdf(rec.n);
+        srec.skip_pdf = false;
+        return true;
+    }
+
+     __HD__ double scattering_pdf(const Ray& r_in, const hit_record& rec, const Ray& scattered) const override {
+        auto cos_theta = dot(rec.n, normalize(scattered.dir));
+        return cos_theta < 0 ? 0 : cos_theta/pi;
     }
 
   private:
-    Vector3 color;
+    texture* albedo;
 };
+
+
+class metal : public Material {
+  public:
+     __HD__ metal(const Vector3& a, double f) : albedo(a), fuzz(f < 1 ? f : 1) {}
+
+     __HD__ bool scatter(const Ray& r_in, const hit_record& rec, scatter_record& srec, void* rand_state) const override {
+        srec.attenuation = albedo;
+        srec.pdf_ptr = nullptr;
+        srec.skip_pdf = true;
+        vec3 reflected = reflect(normalize(r_in.dir), rec.n);
+        srec.skip_pdf_Ray =
+            Ray(rec.position, reflected + fuzz*random_in_unit_sphere(rand_state));
+        return true;
+    }
+
+  private:
+    Vector3 albedo;
+    double fuzz;
+};
+
+
+class dielectric : public Material {
+  public:
+     __HD__ dielectric(double index_of_refraction) : ir(index_of_refraction) {}
+
+     __HD__ bool scatter(const Ray& r_in, const hit_record& rec, scatter_record& srec, void* rand_state) const override {
+        srec.attenuation = Vector3(1.0, 1.0, 1.0);
+        srec.pdf_ptr = nullptr;
+        srec.skip_pdf = true;
+        double refraction_ratio = rec.front_face ? (1.0/ir) : ir;
+
+        vec3 unit_direction = normalize(r_in.dir);
+        double cos_theta = min(dot(-unit_direction, rec.n), 1.0);
+        double sin_theta = sqrt(1.0 - cos_theta*cos_theta);
+
+        bool cannot_refract = refraction_ratio * sin_theta > 1.0;
+        vec3 direction;
+
+        if (cannot_refract || reflectance(cos_theta, refraction_ratio) > NextRand(rand_state))
+            direction = reflect(unit_direction, rec.n);
+        else
+            direction = refract(unit_direction, rec.n, refraction_ratio);
+
+        srec.skip_pdf_Ray = Ray(rec.position, direction);
+        return true;
+    }
+
+  private:
+    double ir; // Index of Refraction
+
+     __HD__ static double reflectance(double cosine, double ref_idx) {
+        // Use Schlick's approximation for reflectance.
+        auto r0 = (1-ref_idx) / (1+ref_idx);
+        r0 = r0*r0;
+        return r0 + (1-r0)*pow((1 - cosine),5);
+    }
+};
+
+
+class diffuse_light : public Material {
+  public:
+     __HD__ diffuse_light(texture* a) : emit(a) {}
+     __HD__ diffuse_light(Vector3 c) : emit(new solid_color(c)) {}
+
+     __HD__ Vector3 emitted(const Ray& r_in, const hit_record& rec, double u, double v, const point3& p)
+    const override {
+        if (!rec.front_face)
+            return Vector3(0,0,0);
+        return emit->value(u, v, p);
+    }
+
+  private:
+    texture* emit;
+};
+
+
+// class isotropic : public material {
+//   public:
+//     isotropic(Vector3 c) : albedo(make_shared<solid_Vector3>(c)) {}
+//     isotropic(texture* a) : albedo(a) {}
+
+//     bool scatter(const Ray& r_in, const hit_record& rec, scatter_record& srec, void* rand_state) const override {
+//         srec.attenuation = albedo->value(rec.u, rec.v, rec.position);
+//         srec.pdf_ptr = make_shared<sphere_pdf>();
+//         srec.skip_pdf = false;
+//         return true;
+//     }
+
+//     double scattering_pdf(const Ray& r_in, const hit_record& rec, const Ray& scattered)
+//     const override {
+//         return 1 / (4 * pi);
+//     }
+
+//   private:
+//     texture* albedo;
+// };
+
 
 #endif
